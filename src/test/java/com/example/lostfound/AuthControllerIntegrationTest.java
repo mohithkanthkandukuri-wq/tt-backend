@@ -46,7 +46,8 @@ class AuthControllerIntegrationTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerReq)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
 
         // 3. Login with credentials
         LoginRequest loginReq = new LoginRequest("integration@findit.edu", "Secret@123");

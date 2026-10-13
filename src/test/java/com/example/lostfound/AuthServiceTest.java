@@ -4,7 +4,7 @@ import com.example.lostfound.dto.request.RegisterRequest;
 import com.example.lostfound.dto.response.AuthResponse;
 import com.example.lostfound.entity.Role;
 import com.example.lostfound.entity.User;
-import com.example.lostfound.exception.BadRequestException;
+import com.example.lostfound.exception.ConflictException;
 import com.example.lostfound.repository.UserRepository;
 import com.example.lostfound.security.JwtTokenProvider;
 import com.example.lostfound.service.impl.AuthServiceImpl;
@@ -51,7 +51,7 @@ class AuthServiceTest {
     void register_ShouldThrowException_WhenEmailAlreadyExists() {
         when(userRepository.existsByEmail("test@example.com")).thenReturn(true);
 
-        assertThrows(BadRequestException.class, () -> authService.register(registerRequest));
+        assertThrows(ConflictException.class, () -> authService.register(registerRequest));
         verify(userRepository, never()).save(any());
     }
 
@@ -59,8 +59,11 @@ class AuthServiceTest {
     void register_ShouldSucceed_WhenValidRequest() {
         when(userRepository.existsByEmail("test@example.com")).thenReturn(false);
         when(passwordEncoder.encode(any())).thenReturn("encodedPassword");
-        Authentication auth = mock(Authentication.class);
-        when(authenticationManager.authenticate(any())).thenReturn(auth);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(10L);
+            return u;
+        });
         when(tokenProvider.generateToken(any())).thenReturn("dummy-jwt-token");
 
         AuthResponse response = authService.register(registerRequest);

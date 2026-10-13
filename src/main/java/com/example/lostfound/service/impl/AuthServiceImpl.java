@@ -7,8 +7,10 @@ import com.example.lostfound.dto.response.UserSummaryResponse;
 import com.example.lostfound.entity.Role;
 import com.example.lostfound.entity.User;
 import com.example.lostfound.exception.BadRequestException;
+import com.example.lostfound.exception.ConflictException;
 import com.example.lostfound.repository.UserRepository;
 import com.example.lostfound.security.JwtTokenProvider;
+import com.example.lostfound.security.UserPrincipal;
 import com.example.lostfound.service.AuthService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -41,27 +43,28 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponse register(RegisterRequest registerRequest) {
         String email = registerRequest.getEmail().trim().toLowerCase();
         if (userRepository.existsByEmail(email)) {
-            throw new BadRequestException("Email address already in use: " + email);
+            throw new ConflictException("An account with this email already exists: " + email);
         }
 
         User user = new User(
                 registerRequest.getName().trim(),
                 email,
                 passwordEncoder.encode(registerRequest.getPassword()),
-                registerRequest.getPhone() != null ? registerRequest.getPhone().trim() : null,
+                registerRequest.getPhone() != null && !registerRequest.getPhone().trim().isEmpty() ? registerRequest.getPhone().trim() : null,
                 Role.USER
         );
 
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(email, registerRequest.getPassword())
+        UserPrincipal userPrincipal = UserPrincipal.create(savedUser);
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userPrincipal, null, userPrincipal.getAuthorities()
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = tokenProvider.generateToken(authentication);
 
-        return new AuthResponse(jwt, new UserSummaryResponse(user));
+        return new AuthResponse(jwt, new UserSummaryResponse(savedUser));
     }
 
     @Override
